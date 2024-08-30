@@ -11,10 +11,17 @@ app.use(cors({
 
 app.use(express.json({limit:"16kb"})) // setting the limit for max json size
 
-app.use(express.urlencoded({extended:true,          limit:"16kb"})) // understanding the encoded urls like added %20 for space in url
+app.use(express.urlencoded({extended:true, limit:"16kb"})) // understanding the encoded urls like added %20 for space in url
 
 app.use(express.static("public")) // for storing files, images
 
 app.use(cookieParser())
+
+import userRouter from './routes/user.routes.js'
+
+app.use('/api/v1/users', userRouter)
+
+
+
 
 export default app;
