@@ -15,7 +15,7 @@ app.use(express.urlencoded({extended:true, limit:"16kb"})) // understanding the 
 
 app.use(express.static("public")) // for storing files, images
 
-app.use(cookieParser())
+app.use(cookieParser()) // giving access to req to cookies
 
 import userRouter from './routes/user.routes.js'
 
