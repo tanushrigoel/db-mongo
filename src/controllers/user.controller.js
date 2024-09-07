@@ -160,11 +160,7 @@ const logoutUser = asyncHandler1(async(req, res)=>{
         }
     },{
         new:true
-    })
-    console.log(req);
-    
-    console.log(req.user);
-    
+    })    
 
     const options={
         httpOnly:true,
@@ -208,7 +204,7 @@ const refreshAccessToken = asyncHandler1(async(req, res)=>{
         .cookie("refreshToken", newRefreshToken, options)
         .json(
             new ApiResponse(200, {
-                accessToken, refreshToken
+                accessToken, newRefreshToken
             },"access token generated successfully")
         )
     } catch (error) {
@@ -217,9 +213,115 @@ const refreshAccessToken = asyncHandler1(async(req, res)=>{
 
 })
 
+const changeCurrentPassword = asyncHandler1(async(req, res)=>{
+    const {oldPassword, newPassword}=req.body;
+    
+    const user=await User.findById(req.user?._id);
+    
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+    
+    if(!isPasswordCorrect){
+        throw new ApiError(404, "Invalid password");
+    }
+
+    user.password = newPassword;
+    
+    await user.save({validateBeforeSave:false})
+
+    return res.status(200).json(new ApiResponse(200, "Password changed successfully"))
+
+})
+// make file updation a separate handler else it causes network congestion as it sends text data again as well
+const updateAccountDetails = asyncHandler1(async(req, res)=>{
+    const {fullname, email}=req.body;
+
+    if(!fullname || !email){
+        throw new ApiError(400, "Both fullname and email is required");
+    }
+    const user = User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                fullname,
+                email
+            }
+        },
+        {
+            new:true
+        } // info after changing will be returned
+    ).select("-password");
+
+    return res.status(200).json(new ApiResponse(200, user, "Account details updated successfully"))
 
 
 
-export {registerUser, loginUser, logoutUser, refreshAccessToken}
+})
+
+
+const getCurrentUser = asyncHandler1(async(req, res)=>{
+    return res.status(200)
+    .json(200, 
+        req.user, 
+        "Current user fetched successfully"
+    )
+})
+
+const updateUserAvatar = asyncHandler1(async(req, res)=>{
+    const avatarLocalPath = req.file?.path;
+
+    if(!avatarLocalPath){
+        throw new ApiError(400, "Avatar file is missing");
+    }
+
+    const avatar = await uploadCloudinary(avatarLocalPath)
+
+    if(!avatar.url){
+        throw new ApiError(400, "Wrror while uploading on avatar");
+    }
+
+    const user = await User.findByIdAndUpdate(req.user?._id,
+        {
+            $set:{
+                avatar:avatar.url
+            }
+        },
+        {
+            new:true
+        }
+    ).select("-password");
+
+    return res.status(200).json(new ApiResponse(200, user, "Avatar image updated successfully"))
+
+})
+const updateUserCoverImage = asyncHandler1(async(req, res)=>{
+    const coverImageLocalPath = req.file?.path;
+
+    if(!coverImageLocalPath){
+        throw new ApiError(400, "Cover file is missing");
+    }
+
+    const coverImage = await uploadCloudinary(coverImageLocalPath)
+
+    if(!coverImage.url){
+        throw new ApiError(400, "Wrror while uploading on avatar");
+    }
+
+    const user = await User.findByIdAndUpdate(req.user?._id,
+        {
+            $set:{
+                coverImage:coverImage.url
+            }
+        },
+        {
+            new:true
+        }
+    ).select("-password");
+
+    return res.status(200).json(new ApiResponse(200, user, "Cover image updated successfully"))
+
+})
+
+
+export {registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails, updateUserAvatar, updateUserCoverImage}
 
 
