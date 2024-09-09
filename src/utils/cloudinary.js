@@ -1,8 +1,6 @@
-import {v2 as cloud} from "cloudinary"
 import fs from "fs"
 
 import { v2 as cloudinary } from 'cloudinary';
-import { log } from "console";
 
 (async function() {
 

@@ -4,7 +4,9 @@ import {User} from "../models/user_model.js"
 import { uploadCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { checkEmail } from "../utils/checkEmail.js";
-import {jwt} from "jsonwebtoken"
+import { deleteCloudinary } from "../utils/Deletecloudinary.js";
+// import {jwt} from "jsonwebtoken"
+import jwt from "jsonwebtoken"
 // writing async functions the better way
 const generateAccessAndRefreshTokens = async(userId)=>{
     try{
@@ -26,7 +28,7 @@ const generateAccessAndRefreshTokens = async(userId)=>{
 
 const registerUser = asyncHandler1(async(req, res)=>{
     const {fullname, email, username, password} = req.body
-    console.log(req.body);
+    // console.log(req.body);
     console.log(req);
 
     if([fullname, email, username, password].some((field)=> field?.trim() === "" )){
@@ -231,6 +233,7 @@ const changeCurrentPassword = asyncHandler1(async(req, res)=>{
     return res.status(200).json(new ApiResponse(200, "Password changed successfully"))
 
 })
+
 // make file updation a separate handler else it causes network congestion as it sends text data again as well
 const updateAccountDetails = asyncHandler1(async(req, res)=>{
     const {fullname, email}=req.body;
@@ -238,7 +241,7 @@ const updateAccountDetails = asyncHandler1(async(req, res)=>{
     if(!fullname || !email){
         throw new ApiError(400, "Both fullname and email is required");
     }
-    const user = User.findByIdAndUpdate(
+    const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set:{
@@ -267,7 +270,9 @@ const getCurrentUser = asyncHandler1(async(req, res)=>{
 })
 
 const updateUserAvatar = asyncHandler1(async(req, res)=>{
-    const avatarLocalPath = req.file?.path;
+    const avatarLocalPath = req.files?.avatar[0].path;
+    console.log(req)
+    // console.log(req.file)
 
     if(!avatarLocalPath){
         throw new ApiError(400, "Avatar file is missing");
@@ -276,7 +281,15 @@ const updateUserAvatar = asyncHandler1(async(req, res)=>{
     const avatar = await uploadCloudinary(avatarLocalPath)
 
     if(!avatar.url){
-        throw new ApiError(400, "Wrror while uploading on avatar");
+        throw new ApiError(400, "Error while uploading on avatar");
+    }
+
+    const prevAvatarURL=req.user.avatar;
+
+    const response = await deleteCloudinary(prevAvatarURL);
+
+    if(!response){
+        throw new ApiError(400, "Previous avatar can't deleted")
     }
 
     const user = await User.findByIdAndUpdate(req.user?._id,
@@ -294,7 +307,7 @@ const updateUserAvatar = asyncHandler1(async(req, res)=>{
 
 })
 const updateUserCoverImage = asyncHandler1(async(req, res)=>{
-    const coverImageLocalPath = req.file?.path;
+    const coverImageLocalPath = req.files?.coverImage[0].path;
 
     if(!coverImageLocalPath){
         throw new ApiError(400, "Cover file is missing");
@@ -303,7 +316,7 @@ const updateUserCoverImage = asyncHandler1(async(req, res)=>{
     const coverImage = await uploadCloudinary(coverImageLocalPath)
 
     if(!coverImage.url){
-        throw new ApiError(400, "Wrror while uploading on avatar");
+        throw new ApiError(400, "Error while uploading on avatar");
     }
 
     const user = await User.findByIdAndUpdate(req.user?._id,
