@@ -319,6 +319,14 @@ const updateUserCoverImage = asyncHandler1(async(req, res)=>{
         throw new ApiError(400, "Error while uploading on avatar");
     }
 
+    const prevCoverUrl = req.user.coverImage;
+
+    const response = await deleteCloudinary(prevCoverUrl);
+
+    if(!response){
+        throw new ApiError(500, "Previous cover image can't be deleted");
+    }
+
     const user = await User.findByIdAndUpdate(req.user?._id,
         {
             $set:{
