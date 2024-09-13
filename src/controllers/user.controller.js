@@ -7,6 +7,7 @@ import { checkEmail } from "../utils/checkEmail.js";
 import { deleteCloudinary } from "../utils/Deletecloudinary.js";
 // import {jwt} from "jsonwebtoken"
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose";
 // writing async functions the better way
 const generateAccessAndRefreshTokens = async(userId)=>{
     try{
@@ -342,7 +343,126 @@ const updateUserCoverImage = asyncHandler1(async(req, res)=>{
 
 })
 
+const getUserChannelProfile = asyncHandler1(async(req, res)=>{
+    
+    const {username} = req.params;
 
-export {registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails, updateUserAvatar, updateUserCoverImage}
+    if(!username?.trim){
+        throw new ApiError(400, "Username is missing");
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match:{
+                username:username?.toLowerCase()
+            }
+        },{
+            $lookup:{ // counting subscribers 
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"channel",
+                as:"subscribers"
+            }
+        },{
+            $lookup:{ // counting how many subscribed to
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"subcriber",
+                as:"subscribedTo"
+            }
+        },{
+            $addFields:{
+                subscibersCount:{
+                    $size:"$subscribers"
+                },
+                channelsSubsribedToCount:{
+                    $size:"$subscribedTo"
+                },
+                isSubscribed:{
+                    $cond:{
+                        if:{$in:[req.user?._id, "$subscribers.subscriber"]},
+                        then:true,
+                        else:false
+                    }
+                }
+            }
+        },{
+            $project:{
+                fullname:1,
+                username:1,
+                subscibersCount:1,
+                channelsSubsribedToCount:1,
+                isSubscribed:1,
+                avatar:1,
+                coverImage:1,
+                email:1,
+            }
+        }    
+    ])
+
+    if(!channel?.length){
+        throw new ApiError(404, "channel does not exist")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0], "User channel found")
+    )
+    
+})
+
+const getWatchHistory = asyncHandler1(async(req, res)=>{
+    const user_id = req.user._id; // when getting from mongodb we get a string but in between mongoose convert it to an id
 
 
+    // aggregation pipeline code is directly passed to mongodb 
+    const user = await User.aggregate([
+        {
+            $match:{
+                _id:new mongoose.Types.ObjectId(req.user._id)
+            }
+        }, 
+        { // looking in videos 
+            $lookup:{
+                from:"videos",
+                localField:"watchHistory",
+                foreignField:"_id",
+                as:"watchHistory",
+                pipeline:[
+                    {
+                        $lookup:{
+                            from:"users",
+                            localField:"owner",
+                            foreignField:"_id",
+                            as:"owner",
+                            pipeline:[
+                                {
+                                    $project:{
+                                        fullname:1,
+                                        username:1,
+                                        avatar:1
+                                    }
+                                }
+                            ]
+                        }
+                    },{
+                        $addFields:{
+                            owner:{
+                                $first:"$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res.status(200).json(new ApiResponse(200, user[0].watchHistory,"Watch history successfully extracted"));
+
+})
+
+
+export {
+    registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails, updateUserAvatar, updateUserCoverImage, getUserChannelProfile, getWatchHistory
+}
